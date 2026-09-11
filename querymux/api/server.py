@@ -35,7 +35,12 @@ class QueryResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "backend": BACKEND, "target": TARGET}
+    return {
+        "status": "ok",
+        "backend": BACKEND,
+        "target": TARGET,
+        "editor_language": adapter.EDITOR_LANGUAGE,
+    }
 
 
 @app.post("/query", response_model=QueryResponse)

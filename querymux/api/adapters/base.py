@@ -36,6 +36,14 @@ class Adapter(Protocol):
 
     target: str  # human-readable, shown in the TUI title bar
 
+    # Textual TextArea language id (see BUILTIN_LANGUAGES in textual's
+    # _text_area.py) used to syntax-highlight the query pane. Query syntax
+    # is backend-specific — SQL for SQLite/Postgres, filter documents for
+    # Mongo, etc. — so each adapter declares its own rather than the TUI
+    # guessing from `backend`. Falls back to plain text if the adapter
+    # names a language Textual doesn't have a grammar for.
+    EDITOR_LANGUAGE: str
+
     def translate(self, query_text: str) -> Any:
         """Turn raw query-pane text into whatever `execute` needs."""
         ...

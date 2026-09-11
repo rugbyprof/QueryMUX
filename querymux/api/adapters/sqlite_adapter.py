@@ -10,6 +10,8 @@ MAX_ROWS = 500
 
 
 class SQLiteAdapter(Adapter):
+    EDITOR_LANGUAGE = "sql"
+
     def __init__(self, db_path: str):
         self.db_path = db_path
         self.target = db_path

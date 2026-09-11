@@ -1,6 +1,7 @@
 """Entry point: parses CLI args, starts the FastAPI backend as a background
 subprocess (unless --no-server), waits for it to come up, then runs the TUI.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -23,22 +24,33 @@ def _find_free_port(preferred: int = 8756) -> int:
             return s.getsockname()[1]
 
 
-def _start_server(backend: str, target: str, port: int) -> subprocess.Popen:
+def _start_server(
+    backend: str, target: str, port: int
+) -> tuple[subprocess.Popen, dict]:
     env = os.environ.copy()
     env["QUERYMUX_BACKEND"] = backend
     env["QUERYMUX_TARGET"] = target
     proc = subprocess.Popen(
         [
-            sys.executable, "-m", "uvicorn", "querymux.api.server:app",
-            "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning",
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "querymux.api.server:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--log-level",
+            "warning",
         ],
         env=env,
     )
     health_url = f"http://127.0.0.1:{port}/health"
     for _ in range(50):  # ~5s
         try:
-            if httpx.get(health_url, timeout=0.2).status_code == 200:
-                return proc
+            resp = httpx.get(health_url, timeout=0.2)
+            if resp.status_code == 200:
+                return proc, resp.json()
         except httpx.HTTPError:
             pass
         time.sleep(0.1)
@@ -46,16 +58,32 @@ def _start_server(backend: str, target: str, port: int) -> subprocess.Popen:
     raise RuntimeError("QueryMUX backend didn't come up in time.")
 
 
+def _fetch_health(api_url: str) -> dict:
+    try:
+        resp = httpx.get(f"{api_url}/health", timeout=2)
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPError as exc:
+        raise RuntimeError(
+            f"Couldn't reach QueryMUX backend at {api_url}: {exc}"
+        ) from exc
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="querymux")
     parser.add_argument("--backend", default="sqlite", choices=["sqlite"])
-    parser.add_argument("--db", help="Path to the SQLite database file (required for --backend sqlite)")
+    parser.add_argument(
+        "--db", help="Path to the SQLite database file (required for --backend sqlite)"
+    )
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument(
-        "--no-server", action="store_true",
+        "--no-server",
+        action="store_true",
         help="Don't spawn the API server — connect to one already running (requires --api-url)",
     )
-    parser.add_argument("--api-url", default=None, help="Existing backend URL, used with --no-server")
+    parser.add_argument(
+        "--api-url", default=None, help="Existing backend URL, used with --no-server"
+    )
     args = parser.parse_args()
 
     if args.backend == "sqlite" and not args.db:
@@ -68,14 +96,23 @@ def main() -> None:
         if not args.api_url:
             parser.error("--no-server requires --api-url")
         api_url = args.api_url.rstrip("/")
+        health = _fetch_health(api_url)
     else:
         port = args.port or _find_free_port()
-        proc = _start_server(args.backend, target, port)
         api_url = f"http://127.0.0.1:{port}"
+        proc, health = _start_server(args.backend, target, port)
+
+    editor_language = health.get("editor_language", "sql")
 
     try:
         from .app import QueryMuxApp
-        QueryMuxApp(api_url=api_url, backend=args.backend, target=target).run()
+
+        QueryMuxApp(
+            api_url=api_url,
+            backend=args.backend,
+            target=target,
+            editor_language=editor_language,
+        ).run()
     finally:
         if proc is not None:
             proc.terminate()
