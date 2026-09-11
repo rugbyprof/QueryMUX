@@ -42,7 +42,13 @@ Or, from a local clone:
 Either way, once installed you can run `querymux` from any shell, in any
 directory:
 
-    querymux --backend sqlite --db ./sample.db
+    `querymux --backend sqlite --db ./sample.db`
+
+Where:
+
+- `querymux` is the command
+- `--backend sqlite` chooses what adapter (db backend) to use
+- `--db ./sample.db` chooses the sqlite db file
 
 To upgrade later: `pipx upgrade querymux` (or `pipx reinstall querymux` after
 a fresh `git pull` if you installed from a local clone). To remove it:
