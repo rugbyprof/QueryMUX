@@ -18,8 +18,44 @@ local FastAPI server, which runs it through the active adapter's `translate()`
 and `execute()` (runs it, returns rows or an error) and logs the attempt to
 `~/.querymux/history.db`.
 
-## Running it
+## Installing it
 
+QueryMUX is a Python CLI, so the recommended way to install it is
+[pipx](https://pipx.pypa.io) — it gives `querymux` its own isolated
+environment and puts it on your `PATH` without touching your system Python.
+
+If you don't have pipx yet:
+
+    python3 -m pip install --user pipx
+    pipx ensurepath
+
+Then, to install QueryMUX straight from GitHub (no clone needed):
+
+    pipx install git+https://github.com/rugbyprof/QueryMUX.git
+
+Or, from a local clone:
+
+    git clone git@github.com:rugbyprof/QueryMUX.git
+    cd QueryMUX
+    pipx install .
+
+Either way, once installed you can run `querymux` from any shell, in any
+directory:
+
+    querymux --backend sqlite --db ./sample.db
+
+To upgrade later: `pipx upgrade querymux` (or `pipx reinstall querymux` after
+a fresh `git pull` if you installed from a local clone). To remove it:
+`pipx uninstall querymux`.
+
+### Developing it
+
+If you're working on QueryMUX itself, install it editable in a venv instead
+so code changes take effect without reinstalling:
+
+    git clone git@github.com:rugbyprof/QueryMUX.git
+    cd QueryMUX
+    python3 -m venv .venv && source .venv/bin/activate
     pip install -e .
     querymux --backend sqlite --db ./sample.db
 
@@ -32,13 +68,13 @@ Use a plain local path.
 
 ## Keybindings
 
-| Key         | Action                                   |
-|-------------|-------------------------------------------|
+| Key             | Action                                                                          |
+| --------------- | ------------------------------------------------------------------------------- |
 | F5 / Ctrl+Enter | Run the current query (Ctrl+Enter depends on terminal support — see note below) |
-| Ctrl+P      | Reformat the query (uppercase keywords, one clause per line) |
-| Ctrl+R      | Toggle query history                      |
-| Tab         | Switch focus between panes                |
-| Ctrl+Q      | Quit                                      |
+| Ctrl+P          | Reformat the query (uppercase keywords, one clause per line)                    |
+| Ctrl+R          | Toggle query history                                                            |
+| Tab             | Switch focus between panes                                                      |
+| Ctrl+Q          | Quit                                                                            |
 
 **Note on Ctrl+Enter:** many terminal emulators can't distinguish Ctrl+Enter from
 plain Enter in raw input mode (no extended keyboard protocol), so it may silently
