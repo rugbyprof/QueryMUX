@@ -13,7 +13,7 @@ artifact) for the full spec, rollout phases, and open questions.
     Textual TUI  -->  FastAPI backend  -->  DB adapter (translate + execute)
 
 <center>
-<a href="https://res.cloudinary.com/cqd6nje4/image/upload/v1789159668/Screenshot_2026-09-11_at_3.45.18_PM_fkyc1c.png?temp=11" target="_new"><img src="https://res.cloudinary.com/cqd6nje4/image/upload/v1789159668/Screenshot_2026-09-11_at_3.45.18_PM_fkyc1c.png" width="400"></a>
+<a href="https://res.cloudinary.com/cqd6nje4/image/upload/v1789159859/Screenshot_2026-09-11_at_3.45.18_PM_fkyc1c.png" target="_new"><img src="https://res.cloudinary.com/cqd6nje4/image/upload/v1789159859/Screenshot_2026-09-11_at_3.45.18_PM_fkyc1c.png" width="400"></a>
 </center>
 
 The TUI never talks to a database driver directly. It POSTs raw query text to a
