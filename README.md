@@ -22,6 +22,10 @@ local FastAPI server, which runs it through the active adapter's `translate()`
 and `execute()` (runs it, returns rows or an error) and logs the attempt to
 `~/.querymux/history.db`.
 
+<center>
+<a href="https://res.cloudinary.com/cqd6nje4/image/upload/v1789160166/Screenshot_2026-09-11_at_3.55.53_PM_ngqhi4.png" target="_new"><img src="https://res.cloudinary.com/cqd6nje4/image/upload/v1789160166/Screenshot_2026-09-11_at_3.55.53_PM_ngqhi4.png" width="400"></a>
+</center>
+
 ## Installing it
 
 QueryMUX is a Python CLI, so the recommended way to install it is
