@@ -87,6 +87,7 @@ Use a plain local path.
 | F5 / Ctrl+Enter | Run the current query (Ctrl+Enter depends on terminal support — see note below) |
 | Ctrl+P          | Reformat the query (uppercase keywords, one clause per line)                    |
 | Ctrl+R          | Toggle query history                                                            |
+| F9              | Toggle the debug pane (see "Debugging it" below)                                |
 | Tab             | Switch focus between panes                                                      |
 | Ctrl+Q          | Quit                                                                            |
 
@@ -95,3 +96,50 @@ plain Enter in raw input mode (no extended keyboard protocol), so it may silentl
 just insert a newline instead of running the query. `F5` is bound to the same
 action and works everywhere — treat it as the reliable default and Ctrl+Enter as
 a bonus on terminals that support it (Kitty, WezTerm, some iTerm2 configs).
+
+## Debugging it
+
+A DEBUG pane spans the full width below the query/results panes. It's hidden
+by default — press `F9` any time to show or hide it — and shows anything
+printed or logged from either process:
+
+- `print(...)` anywhere in the code (TUI or backend) shows up live once the
+  app has started.
+- The FastAPI backend runs as a separate subprocess (see Architecture
+  above), so its own `print()`/log output is piped over and prefixed
+  `[backend]` rather than being lost or corrupting the terminal.
+- Nothing written while the pane is hidden is lost — toggling it on shows
+  the full backlog, not just new output.
+
+Pass `--debug` to also get:
+
+    querymux --backend sqlite --db ./sample.db --debug
+
+- The pane opens automatically on startup instead of starting hidden.
+- Everything gets logged to `~/.querymux/debug.log` too (both processes),
+  independent of the pane — including anything printed or logged *before*
+  the TUI exists, e.g. early in `__main__.main()`, which `print()` can't
+  reach (there's no pane yet to catch it; a plain `print()` there just
+  flashes on the real terminal for an instant before Textual takes over
+  the screen). Use `logging.debug(...)` instead of `print()` for anything
+  you want to survive that startup window — it's a silent no-op unless
+  `--debug` is on, so it's safe to leave in the code.
+- The backend's own request logging goes from `warning` to `debug`
+  (`uvicorn --log-level debug`), so it shows up too.
+
+Tail the log file from another terminal while QueryMUX is running:
+
+    tail -f ~/.querymux/debug.log
+
+Example output — this is what "which method ran, and when" looks like in
+practice (see `querymux/app.py` for the `logging.debug(...)` calls that
+produce it):
+
+    2026-09-13 12:16:07,315 DEBUG   querymux.app: QueryMuxApp.on_mount: backend=sqlite target=./sample.db api_url=http://127.0.0.1:8821
+    2026-09-13 12:16:07,350 DEBUG   querymux.app: action_run_query: POST http://127.0.0.1:8821/query, 15 chars
+    2026-09-13 12:16:08,495 DEBUG   querymux.app: action_toggle_history: pushing HistoryScreen
+    2026-09-13 12:16:08,512 DEBUG   querymux.app: HistoryScreen.on_mount: fetching history from http://127.0.0.1:8821
+
+Noisy third-party chatter (`httpx`, `httpcore`, `asyncio`'s own event-loop
+logging) is deliberately kept at `warning` even in `--debug` mode, so the
+file stays readable instead of drowning in per-byte HTTP tracing.

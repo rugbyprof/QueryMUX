@@ -71,6 +71,13 @@ def log_entry(
         return cur.lastrowid
 
 
+def delete_entry(entry_id: int) -> None:
+    """Remove one history row — a bad or duplicate query cluttering the
+    list. Silently a no-op if the id is already gone."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM query_history WHERE id = ?", (entry_id,))
+
+
 def recent(limit: int = 50, search: Optional[str] = None) -> list[HistoryEntry]:
     """Most recent entries first, optionally filtered by a substring match
     against the query text."""
