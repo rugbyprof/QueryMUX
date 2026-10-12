@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from .. import history
 from .adapters import build_adapter
+from .adapters.base import MAX_ROWS
 
 if os.environ.get("QUERYMUX_DEBUG") == "1":
     # A separate process from the TUI (started via `uvicorn ...` by
@@ -64,7 +65,7 @@ def health():
     return {
         "status": "ok",
         "backend": BACKEND,
-        "target": TARGET,
+        "target": adapter.target,
         "editor_language": adapter.EDITOR_LANGUAGE,
     }
 
@@ -76,17 +77,13 @@ def run_query(req: QueryRequest):
 
     history.log_entry(
         backend=BACKEND,
-        target=TARGET,
+        target=adapter.target,
         query_text=req.text,
         status="error" if result.error else "ok",
         row_count=result.row_count,
         duration_ms=result.duration_ms,
         error=result.error,
     )
-
-    from .adapters.sqlite_adapter import (
-        MAX_ROWS,
-    )  # only meaningful truncation signal today
 
     return QueryResponse(
         columns=result.columns,

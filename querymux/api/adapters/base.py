@@ -12,6 +12,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Optional, Protocol
 
+# Result-set cap shared by every adapter; the server flags a result as
+# truncated when row_count hits it.
+MAX_ROWS = 500
+
 
 @dataclass
 class QueryResult:

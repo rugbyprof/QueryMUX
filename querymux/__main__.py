@@ -116,9 +116,17 @@ def _fetch_health(api_url: str) -> dict:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="querymux")
-    parser.add_argument("--backend", default="sqlite", choices=["sqlite"])
     parser.add_argument(
-        "--db", help="Path to the SQLite database file (required for --backend sqlite)"
+        "--backend", default="sqlite", choices=["sqlite", "postgres", "postgis"]
+    )
+    parser.add_argument(
+        "--db",
+        help=(
+            "SQLite: path to the database file (required). "
+            "Postgres/PostGIS: libpq connection string, e.g. "
+            "postgresql://user:pass@localhost:5432/mydb or 'dbname=mydb' "
+            "(omit to use PG* env vars / local defaults, like bare psql)"
+        ),
     )
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument(
@@ -145,7 +153,7 @@ def main() -> None:
     if args.backend == "sqlite" and not args.db:
         parser.error("--db is required for --backend sqlite")
 
-    target = args.db
+    target = args.db or ""
     proc = None
 
     if args.no_server:
@@ -159,6 +167,9 @@ def main() -> None:
         proc, health = _start_server(args.backend, target, port, debug=args.debug)
 
     editor_language = health.get("editor_language", "sql")
+    # The adapter's own display form of the target (e.g. a Postgres
+    # connection string with the password masked) for the title bar.
+    display_target = health.get("target", target)
 
     try:
         from .app import QueryMuxApp
@@ -166,7 +177,7 @@ def main() -> None:
         QueryMuxApp(
             api_url=api_url,
             backend=args.backend,
-            target=target,
+            target=display_target,
             editor_language=editor_language,
             backend_proc=proc,
             debug=args.debug,

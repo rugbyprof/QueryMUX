@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from .base import Adapter, QueryResult
-
-MAX_ROWS = 500
+from .base import Adapter, QueryResult, MAX_ROWS
 
 
 class SQLiteAdapter(Adapter):

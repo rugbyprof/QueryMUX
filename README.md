@@ -58,6 +58,18 @@ Where:
 - `--backend sqlite` chooses what adapter (db backend) to use
 - `--db ./sample.db` chooses the sqlite db file
 
+For PostgreSQL (or PostGIS), `--db` takes a libpq connection string instead:
+
+    querymux --backend postgres --db postgresql://user:pass@localhost:5432/mydb
+    querymux --backend postgis  --db "dbname=gisdb"
+    querymux --backend postgres            # PG* env vars / local defaults, like bare psql
+
+Statements run with autocommit on, and a box can hold several `;`-separated
+statements (the last result set with rows is shown). When the PostGIS
+extension is installed in the database, geometry/geography columns are shown
+as EWKT (`SRID=4326;POINT(-98.5 33.9)`) instead of hex WKB. `postgis` is an
+alias for `postgres`; the password is masked in the title bar and history.
+
 To upgrade later: `pipx upgrade querymux` (or `pipx reinstall querymux` after
 a fresh `git pull` if you installed from a local clone). To remove it:
 `pipx uninstall querymux`.
