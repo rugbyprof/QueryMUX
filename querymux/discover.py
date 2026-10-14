@@ -1,8 +1,8 @@
 """What can QueryMUX open on this machine? Three questions, answered cheaply:
 
 1. Backends: is each engine's Python driver installed?
-2. Servers:  for server engines (Postgres), is one listening, and which
-             databases can we see?
+2. Servers:  for server engines (Postgres, MongoDB), is one listening, and
+             which databases can we see?
 3. Files:    which SQLite / DuckDB database files are in the folders we scan?
 
 Used by `querymux --list` (a printed report) and by the startup picker shown
@@ -191,6 +191,45 @@ def _postgres_status(status: BackendStatus) -> None:
                        f"({first_line}). Set DATABASE_URL to connect.")
 
 
+def mongo_url() -> str:
+    """Where to look for MongoDB: $MONGO_URL, else the local default."""
+    return os.environ.get("MONGO_URL", "") or "mongodb://localhost:27017/?directConnection=true"
+
+
+_MONGO_SYSTEM_DBS = {"admin", "local", "config"}
+
+
+def _mongo_status(status: BackendStatus) -> None:
+    url = mongo_url()
+    status.base_conninfo = url
+    if url.startswith("mongodb+srv://"):
+        status.note = "Atlas / SRV URL: open it with --db"
+        return
+    u = urlparse(url)
+    host, port = (u.hostname or "localhost"), (u.port or 27017)
+    if not _port_open(host, port):
+        status.note = f"no server on {host}:{port}"
+        return
+    from pymongo import MongoClient
+    from pymongo.errors import PyMongoError
+    try:
+        with MongoClient(url, serverSelectionTimeoutMS=2000) as client:
+            names = client.list_database_names()
+        status.databases = sorted(n for n in names if n not in _MONGO_SYSTEM_DBS)
+        status.note = f"server on {host}:{port}"
+    except PyMongoError as exc:
+        first_line = str(exc).strip().splitlines()[0] if str(exc).strip() else type(exc).__name__
+        status.note = (f"server on {host}:{port}, but can't list databases "
+                       f"({first_line[:120]}). Set MONGO_URL to connect.")
+
+
+def mongo_target(base_url: str, dbname: str) -> str:
+    """The base connection string, with its path pointed at one database."""
+    from urllib.parse import urlsplit, urlunsplit
+    parts = urlsplit(base_url)
+    return urlunsplit(parts._replace(path="/" + dbname))
+
+
 def backend_statuses(check_servers: bool = True) -> list[BackendStatus]:
     """One entry per backend, aliases (postgis) folded into their engine."""
     out = []
@@ -203,6 +242,8 @@ def backend_statuses(check_servers: bool = True) -> list[BackendStatus]:
             st.note = f"driver not installed: pipx inject querymux {driver_package(backend)}"
         elif backend == "postgres" and check_servers:
             _postgres_status(st)
+        elif backend == "mongodb" and check_servers:
+            _mongo_status(st)
         out.append(st)
     return out
 
@@ -235,14 +276,14 @@ def report() -> str:
     lines.append("")
     lines.append("Databases found")
     found = find_databases()
-    pg = next((s for s in statuses if s.backend == "postgres"), None)
-    if not found and not (pg and pg.databases):
+    servers = [s for s in statuses if s.backend in ("postgres", "mongodb") and s.databases]
+    if not found and not servers:
         lines.append("  (none)")
     for f in found:
         lines.append(f"  {f.backend:<9} {_short(f.path):<60} {f.size_label:>9}")
-    if pg and pg.databases:
-        for name in pg.databases:
-            lines.append(f"  {'postgres':<9} {name}")
+    for st in servers:
+        for name in st.databases:
+            lines.append(f"  {st.backend:<9} {name}")
     lines.append("")
     lines.append("Scanned: " + ", ".join(_short(d) for d in scan_dirs()))
     return "\n".join(lines)

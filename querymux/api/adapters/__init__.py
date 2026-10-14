@@ -6,7 +6,7 @@ from .base import Adapter, QueryResult
 
 # backend name -> (adapter module, adapter class, driver package it needs).
 # Adapters are imported only when used, so a missing driver (no duckdb, no
-# psycopg) disables just *that* backend instead of breaking every import.
+# psycopg, no pymongo) disables just *that* backend instead of breaking every import.
 #
 # "postgis" is an alias: PostgresAdapter renders geometry/geography columns
 # as EWKT whenever the extension is installed in the target database.
@@ -15,6 +15,7 @@ _REGISTRY = {
     "duckdb":   ("duckdb_adapter",   "DuckDBAdapter",   "duckdb"),
     "postgres": ("postgres_adapter", "PostgresAdapter", "psycopg"),
     "postgis":  ("postgres_adapter", "PostgresAdapter", "psycopg"),
+    "mongodb":  ("mongo_adapter",    "MongoAdapter",    "pymongo"),
 }
 
 BACKENDS = list(_REGISTRY)

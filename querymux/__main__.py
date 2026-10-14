@@ -116,11 +116,13 @@ def _fetch_health(api_url: str) -> dict:
 
 def _detect_backend(db: str, parser: argparse.ArgumentParser) -> str:
     """--db without --backend: read the file's header, or recognize a
-    Postgres connection URL."""
+    Postgres or MongoDB connection URL."""
     from .discover import detect_backend
 
     if db.startswith(("postgresql://", "postgres://")):
         return "postgres"
+    if db.startswith(("mongodb://", "mongodb+srv://")):
+        return "mongodb"
     path = Path(db).expanduser()
     if not path.exists():
         parser.error(f"--db {db}: no such file (add --backend for a new database)")
@@ -165,6 +167,9 @@ def main() -> None:
             "Postgres/PostGIS: libpq connection string, e.g. "
             "postgresql://user:pass@localhost:5432/mydb or 'dbname=mydb' "
             "(omit to use PG* env vars / local defaults, like bare psql). "
+            "MongoDB: a connection string whose path is the database, e.g. "
+            "mongodb://localhost:27017/mydb?directConnection=true "
+            "(omit to use $MONGO_URL, else localhost and database 'test'). "
             "Omit --db (and --backend) to choose from a list."
         ),
     )
@@ -218,7 +223,7 @@ def main() -> None:
 
     if args.db and not args.backend:
         args.backend = _detect_backend(args.db, parser)
-    if not args.db and args.backend not in ("postgres", "postgis"):
+    if not args.db and args.backend not in ("postgres", "postgis", "mongodb"):
         # No database named: let the user pick one (or quit).
         from .picker import pick
         choice = pick()

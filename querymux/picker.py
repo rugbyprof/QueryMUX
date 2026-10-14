@@ -126,6 +126,11 @@ class PickerApp(App[Choice | None]):
             for name in pg.databases:
                 self._choices.append(("postgres", name, "",
                                       discover.postgres_target(pg.base_conninfo, name)))
+        mongo = next((s for s in self._statuses if s.backend == "mongodb"), None)
+        if mongo and mongo.databases:
+            for name in mongo.databases:
+                self._choices.append(("mongodb", name, "",
+                                      discover.mongo_target(mongo.base_conninfo, name)))
         if "duckdb" in available:
             self._choices.append(("duckdb", "(in memory: query CSV / Parquet files directly)", "", ""))
         self._visible = list(self._choices)

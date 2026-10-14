@@ -311,7 +311,11 @@ class QueryMuxApp(App):
     def action_format_query(self) -> None:
         # Triggered by the Ctrl+P binding above. Entirely local/synchronous
         # (sqlparse) — never touches the backend, unlike action_run_query.
+        # SQL only: sqlparse would mangle a MongoDB shell query.
         logger.debug("action_format_query")
+        if self.editor_language != "sql":
+            self.query_one("#status-line", Static).update("Format (Ctrl+P) is for SQL backends only.")
+            return
         text_area = self.query_one("#query-input", TextArea)
         formatted = sqlparse.format(text_area.text, reindent=True, keyword_case="upper")
         text_area.text = formatted
@@ -386,7 +390,8 @@ class QueryMuxApp(App):
                     Text(str(v), style=styles[i % len(styles)])
                     for i, v in enumerate(row)
                 ])
-            note = " (showing first {} — add LIMIT)".format(len(result["rows"])) if result.get("truncated") else ""
+            limit_hint = "add LIMIT" if self.editor_language == "sql" else "add .limit()"
+            note = f" (showing first {len(result['rows'])} — {limit_hint})" if result.get("truncated") else ""
             status.update(f'{len(result["rows"])} rows · {result["duration_ms"]:.1f} ms{note}')
         else:
             status.update(f'OK · {result["row_count"]} row(s) affected · {result["duration_ms"]:.1f} ms')

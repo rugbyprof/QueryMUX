@@ -5,7 +5,7 @@ terminal tool for comparing how different database engines behave.
 
 ## Status
 
-Backends: SQLite, DuckDB, and PostgreSQL (with PostGIS). See `docs/requirements.md` (or the published requirements
+Backends: SQLite, DuckDB, PostgreSQL (with PostGIS), and MongoDB. See `docs/requirements.md` (or the published requirements
 artifact) for the full spec, rollout phases, and open questions.
 
 ## Architecture
@@ -18,7 +18,8 @@ artifact) for the full spec, rollout phases, and open questions.
 
 The TUI never talks to a database driver directly. It POSTs raw query text to a
 local FastAPI server, which runs it through the active adapter's `translate()`
-(cosmetic/parsing step — a no-op for SQL engines, real work for Mongo/Redis later)
+(cosmetic/parsing step — a no-op for SQL engines; for MongoDB it parses
+mongosh-style text; real work for Redis later)
 and `execute()` (runs it, returns rows or an error) and logs the attempt to
 `~/.querymux/history.db`.
 
@@ -100,8 +101,8 @@ tables are reused, and an existing role's password is never changed.
 Where:
 
 - `querymux` is the command
-- `--backend` chooses the adapter: `sqlite`, `duckdb`, `postgres`, or `postgis`
-- `--db` is the database file (SQLite, DuckDB) or connection string (Postgres)
+- `--backend` chooses the adapter: `sqlite`, `duckdb`, `postgres`, `postgis`, or `mongodb`
+- `--db` is the database file (SQLite, DuckDB) or connection string (Postgres, MongoDB)
 
 **DuckDB** files can be opened for writing by only one process at a time, and
 while one is, nothing else can open them. QueryMUX opens the file per query
@@ -119,6 +120,35 @@ statements (the last result set with rows is shown). When the PostGIS
 extension is installed in the database, geometry/geography columns are shown
 as EWKT (`SRID=4326;POINT(-98.5 33.9)`) instead of hex WKB. `postgis` is an
 alias for `postgres`; the password is masked in the title bar and history.
+
+For **MongoDB**, `--db` is a connection string whose path names the database:
+
+    querymux --db "mongodb://localhost:27017/store?directConnection=true"
+    querymux --backend mongodb             # $MONGO_URL, else localhost and database 'test'
+
+The query box takes the same syntax as `mongosh`, with JavaScript highlighting:
+
+    db.purchases.find({ customer_id: 42 }, { amount: 1 }).sort({ purchase_date: -1 }).limit(10)
+    db.purchases.aggregate([{ $group: { _id: "$state_code", n: { $sum: 1 } } }])
+    db.purchases.countDocuments({ department: "Games" })
+    db.purchases.find({ customer_id: 42 }).explain()        // the plan, one stage per row
+    show dbs; show collections; use other_db
+    { "find": "purchases", "limit": 5 }                      // a raw command document
+
+Also `findOne`, `distinct`, `estimatedDocumentCount`, `insertOne`/`insertMany`,
+`updateOne`/`updateMany`/`replaceOne`, `deleteOne`/`deleteMany`,
+`createIndex`/`dropIndex`/`getIndexes`, `db.getSiblingDB("x")`,
+`db.getCollection("x")`, and `db.runCommand({...})`. Values can be written as
+in mongosh: unquoted keys, single quotes, `ISODate("2025-03-01")`,
+`NumberDecimal("9.99")`, `ObjectId("...")`. Results become a grid: one column
+per top-level field, nested documents and arrays shown as JSON. There's no
+JavaScript engine behind it, so variables, functions, and loops aren't
+supported; for those, use `mongosh` itself. Ctrl+P (format) is SQL-only.
+
+The picker and `--list` show the databases on the server at `$MONGO_URL`
+(default `localhost:27017`). The driver, `pymongo`, installs with QueryMUX; an
+older install picks it up with `pipx upgrade querymux` (or, for an editable
+install, `pipx inject querymux pymongo`).
 
 To upgrade later: `pipx upgrade querymux` (or `pipx reinstall querymux` after
 a fresh `git pull` if you installed from a local clone). To remove it:
