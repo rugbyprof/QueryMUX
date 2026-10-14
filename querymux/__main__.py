@@ -114,19 +114,70 @@ def _fetch_health(api_url: str) -> dict:
         ) from exc
 
 
+def _detect_backend(db: str, parser: argparse.ArgumentParser) -> str:
+    """--db without --backend: read the file's header, or recognize a
+    Postgres connection URL."""
+    from .discover import detect_backend
+
+    if db.startswith(("postgresql://", "postgres://")):
+        return "postgres"
+    path = Path(db).expanduser()
+    if not path.exists():
+        parser.error(f"--db {db}: no such file (add --backend for a new database)")
+    backend = detect_backend(path)
+    if backend is None:
+        parser.error(f"--db {db}: not a SQLite or DuckDB file; say which with --backend")
+    return backend
+
+
+def _require_driver(backend: str, parser: argparse.ArgumentParser) -> None:
+    """Fail here, with a fix, instead of as 'backend didn't come up' later."""
+    import importlib.util
+
+    from .api.adapters import driver_package
+
+    pkg = driver_package(backend)
+    if pkg != "sqlite3" and importlib.util.find_spec(pkg) is None:
+        parser.error(
+            f"--backend {backend} needs the '{pkg}' package. "
+            f"Install it with:  pipx inject querymux {pkg}"
+        )
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="querymux")
+    from .api.adapters import BACKENDS
+
+    parser = argparse.ArgumentParser(
+        prog="querymux",
+        description="Run with no arguments to pick from the databases found on this machine.",
+    )
     parser.add_argument(
-        "--backend", default="sqlite", choices=["sqlite", "postgres", "postgis"]
+        "--backend",
+        default=None,
+        choices=BACKENDS,
+        help="Which engine. Optional when --db is a SQLite or DuckDB file: "
+             "it's detected from the file itself.",
     )
     parser.add_argument(
         "--db",
         help=(
-            "SQLite: path to the database file (required). "
+            "SQLite/DuckDB: path to the database file. "
             "Postgres/PostGIS: libpq connection string, e.g. "
             "postgresql://user:pass@localhost:5432/mydb or 'dbname=mydb' "
-            "(omit to use PG* env vars / local defaults, like bare psql)"
+            "(omit to use PG* env vars / local defaults, like bare psql). "
+            "Omit --db (and --backend) to choose from a list."
         ),
+    )
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="Print the backends available and the databases found, then exit.",
+    )
+    parser.add_argument(
+        "--setup",
+        action="store_true",
+        help="Create practice databases (randData) in every available engine: "
+             "SQLite and DuckDB files, and a Postgres role and database. Then exit.",
     )
     parser.add_argument("--port", type=int, default=None)
     parser.add_argument(
@@ -150,8 +201,31 @@ def main() -> None:
     if args.debug:
         _configure_debug_logging()
 
-    if args.backend == "sqlite" and not args.db:
-        parser.error("--db is required for --backend sqlite")
+    if args.list:
+        from .discover import report
+        print(report())
+        return
+
+    if args.setup:
+        from . import setup_test
+        use_docker = False
+        if setup_test.postgres_plan() == "docker":
+            print("No Postgres server is running, but Docker is installed.")
+            print("Start one with:  " + " ".join(setup_test.docker_command()))
+            use_docker = input("Run it now? [y/N] ").strip().lower() in ("y", "yes")
+        print(setup_test.format_results(setup_test.run_setup(use_docker)))
+        return
+
+    if args.db and not args.backend:
+        args.backend = _detect_backend(args.db, parser)
+    if not args.db and args.backend not in ("postgres", "postgis"):
+        # No database named: let the user pick one (or quit).
+        from .picker import pick
+        choice = pick()
+        if choice is None:
+            return
+        args.backend, args.db = choice
+    _require_driver(args.backend, parser)
 
     target = args.db or ""
     proc = None

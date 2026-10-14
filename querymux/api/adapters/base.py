@@ -8,13 +8,34 @@ text through.
 """
 from __future__ import annotations
 
+import datetime
+import decimal
+import json
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional, Protocol
 
 # Result-set cap shared by every adapter; the server flags a result as
 # truncated when row_count hits it.
 MAX_ROWS = 500
+
+
+def to_jsonable(value: Any) -> Any:
+    """Rows go back to the TUI as JSON. Keep primitives as-is; render the
+    rest (Decimal, timestamps, intervals, bytes, arrays, nested values, ...)
+    the way a database shell would rather than letting the response encoder
+    choke or reformat. Shared by every adapter whose driver returns rich types."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return "\\x" + bytes(value).hex()
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, default=str)
+    if isinstance(value, (decimal.Decimal, uuid.UUID, datetime.date,
+                          datetime.time, datetime.timedelta)):
+        return str(value)
+    return str(value)
 
 
 @dataclass

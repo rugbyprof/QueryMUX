@@ -5,7 +5,7 @@ terminal tool for comparing how different database engines behave.
 
 ## Status
 
-Phase 1: SQLite backend. See `docs/requirements.md` (or the published requirements
+Backends: SQLite, DuckDB, and PostgreSQL (with PostGIS). See `docs/requirements.md` (or the published requirements
 artifact) for the full spec, rollout phases, and open questions.
 
 ## Architecture
@@ -48,15 +48,65 @@ Or, from a local clone:
     pipx install .
 
 Either way, once installed you can run `querymux` from any shell, in any
-directory:
+directory.
 
-    `querymux --backend sqlite --db ./sample.db`
+### Pick from what's on this machine
+
+    querymux
+
+With no `--db`, QueryMUX opens a picker: which backends are ready (is each
+driver installed, is a Postgres server listening), then every database it
+found. Arrow keys and Enter open one, `/` filters, `q` quits. The same report,
+printed instead of interactive:
+
+    querymux --list
+
+Files are found in the current folder, `$DATA_DIR` and `$DUCKDB_DIR` if set,
+and any folders listed in `~/.querymux/config.toml`:
+
+    scan = ["~/5303_data", "~/projects/shop"]
+
+Each file is identified by its first bytes, not its extension, and never
+opened for writing while browsing. Postgres databases are listed when a server
+answers at `$DATABASE_URL` (or libpq's defaults, like bare `psql`).
+
+### Practice databases
+
+    querymux --setup        # or press s in the picker
+
+Creates the same small random dataset (`people`, `orders`) in every engine
+that's available:
+
+| Engine   | What you get |
+| -------- | ------------ |
+| SQLite   | `~/.querymux/randData.db` |
+| DuckDB   | `~/.querymux/randData.duckdb` |
+| Postgres | role `student`, password `letmein`, owning database `randData` |
+
+For Postgres it connects as an admin (`$DATABASE_URL`, or libpq's defaults
+like bare `psql`) to create the role and database, then prints the
+credentials and a ready-to-paste `psql` command. If no server is running and
+Docker is installed, it offers to start one (`postgres:17`, container
+`querymux-postgres`). It's safe to run again: existing roles, databases, and
+tables are reused, and an existing role's password is never changed.
+
+### Open one directly
+
+    querymux --db ./sample.db                 # SQLite or DuckDB: detected from the file
+    querymux --db ./store.duckdb
+    querymux --backend duckdb                 # in-memory DuckDB: query CSV/Parquet files directly
+    querymux --backend sqlite --db ./new.db   # a new file needs --backend
 
 Where:
 
 - `querymux` is the command
-- `--backend sqlite` chooses what adapter (db backend) to use
-- `--db ./sample.db` chooses the sqlite db file
+- `--backend` chooses the adapter: `sqlite`, `duckdb`, `postgres`, or `postgis`
+- `--db` is the database file (SQLite, DuckDB) or connection string (Postgres)
+
+**DuckDB** files can be opened for writing by only one process at a time, and
+while one is, nothing else can open them. QueryMUX opens the file per query
+and closes it right after; if another program holds it, the query comes back
+with DuckDB's "Could not set lock on file" error.
 
 For PostgreSQL (or PostGIS), `--db` takes a libpq connection string instead:
 

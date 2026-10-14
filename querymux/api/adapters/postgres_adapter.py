@@ -16,16 +16,12 @@ one extra round trip per spatial column. No PostGIS, no extra work.
 """
 from __future__ import annotations
 
-import datetime
-import decimal
-import json
-import uuid
 from typing import Any
 
 import psycopg
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from .base import Adapter, QueryResult, MAX_ROWS
+from .base import Adapter, QueryResult, MAX_ROWS, to_jsonable as _to_jsonable
 
 _SPATIAL_TYPES = ("geometry", "geography", "box2d", "box3d")
 
@@ -42,22 +38,6 @@ def _display_target(conninfo: str) -> str:
     if "password" in params:
         params["password"] = "***"
     return make_conninfo(**params)
-
-
-def _to_jsonable(value: Any) -> Any:
-    """Rows go back to the TUI as JSON. Keep primitives as-is; render the
-    rest (Decimal, timestamps, intervals, bytea, arrays, jsonb, ...) the way
-    psql would rather than letting the response encoder choke or reformat."""
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    if isinstance(value, (bytes, bytearray, memoryview)):
-        return "\\x" + bytes(value).hex()
-    if isinstance(value, (dict, list)):
-        return json.dumps(value, default=str)
-    if isinstance(value, (decimal.Decimal, uuid.UUID, datetime.date,
-                          datetime.time, datetime.timedelta)):
-        return str(value)
-    return str(value)
 
 
 class PostgresAdapter(Adapter):
